@@ -396,7 +396,7 @@ func (node *Node) Stabilize() {
 		successor = newSuccessor
 	}
 	var successorList [successorListSize]NodeInformation
-	err := RemoteCall(successor.address, "Node.GetsuccessorList", "", &successorList)
+	err := RemoteCall(successor.address, "Node.GetSuccessorList", "", &successorList)
 	if err != nil {
 		logrus.Errorf("[Stabilize] %s GetSuccessorList of %s, error: %v\n", node.address, successor.address, err)
 		return

@@ -129,11 +129,7 @@ func (node *Node) StopRPCServer() {
 }
 
 func GetClient(address string) (*rpc.Client, error) {
-	var (
-		conn net.Conn
-		err  error
-	)
-	conn, err = net.DialTimeout("tcp", address, 800*time.Millisecond)
+	conn, err := net.DialTimeout("tcp", address, 800*time.Millisecond)
 	if err == nil {
 		logrus.Infof("[GetClient] success!\n")
 		return rpc.NewClient(conn), err
@@ -153,6 +149,8 @@ func RemoteCall(address, method string, args, reply interface{}) error {
 	err = client.Call(method, args, reply)
 	if err == nil {
 		logrus.Infof("[RemoteCall] success!\n")
+	} else {
+		logrus.Errorf("[RemoteCall] failed, error: %v\n", err)
 	}
 	return err
 }
@@ -170,10 +168,14 @@ func (node *Node) Run() {
 func (node *Node) Create() {
 	logrus.Infof("[Create] %s Created!\n", node.address)
 	node.SetOnline(true)
+	node.successorLock.Lock()
 	node.successorList[0] = NodeInformation{node.address, node.ID}
+	node.successorLock.Unlock()
+	node.fingerLock.Lock()
 	for i := 0; i < hashLength; i++ {
 		node.finger[i] = NodeInformation{node.address, node.ID}
 	}
+	node.fingerLock.Unlock()
 	node.Maintain()
 }
 
@@ -248,7 +250,7 @@ func (node *Node) CheckPredecessor() {
 	}
 }
 
-func (node *Node) checkPredecessor(_ string, _ *string) error {
+func (node *Node) RemoteCheckPredecessor(_ string, _ *string) error {
 	node.CheckPredecessor()
 	return nil
 }
@@ -474,7 +476,11 @@ func (node *Node) Join(address string) bool {
 	return true
 }
 
+var cnt = 0
+
 func (node *Node) Quit() {
+	cnt++
+	logrus.Infof("[CNT] cnt = %d\n", cnt)
 	if !node.Online() {
 		logrus.Warnf("[Quit] %s already offline...\n", node.address)
 		return
@@ -482,14 +488,21 @@ func (node *Node) Quit() {
 	logrus.Infof("[Quit] %s quit successfully.\n", node.address)
 	node.StopRPCServer()
 	successor := node.FindOnlineSuc()
-	err := RemoteCall(successor.address, "Node.checkPredecessor", "", nil)
+	logrus.Infof("[Quit] successor.address = %s\n", successor.address)
+	err := RemoteCall(successor.address, "Node.RemoteCheckPredecessor", "", nil)
 	if err != nil {
 		logrus.Errorf("[Quit] %s calls %s CheckPredecessor, error: %v\n", node.address, successor.address, err)
+	} else {
+		logrus.Infof("[Quit] %s calls %s CheckPredecessor, success!\n", node.address, successor.address)
 	}
 	predecessor := node.getPredecessor()
+	logrus.Infof("[Quit] predecessor.address = %s\n", predecessor.address)
 	err = RemoteCall(predecessor.address, "Node.RemoteStabilize", "", nil)
 	if err != nil {
-		logrus.Errorf("[Quit] %s calls %s Stabilize, error: %v\n", node.address, predecessor.address, err)
+		logrus.Errorf("[Quit] %s calls %s RemoteStabilize, error: %v\n", node.address, predecessor.address, err)
+	} else {
+		logrus.Infof("[Quit] %s calls %s RemoteStabilize, success!\n", node.address, predecessor.address)
+
 	}
 	node.ResetMap()
 }

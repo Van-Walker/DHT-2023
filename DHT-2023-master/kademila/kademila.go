@@ -213,6 +213,7 @@ func (node *Node) Republish() {
 }
 
 func (node *Node) Put(key, value string) bool {
+	logrus.Infof("[Put] node < %s > put pair { < %s > < %s > }.", node.address.IP, key, value)
 	id := ConsistentHash(key)
 	kClosest := node.NodeLookUp(&id)
 	kClosest.Insert(node.address)
@@ -231,6 +232,7 @@ func (node *Node) Put(key, value string) bool {
 }
 
 func (node *Node) Get(key string) (bool, string) {
+	logrus.Infof("[Get] node < %s > get key < %s >.", node.address.IP, key)
 	id := ConsistentHash(key)
 	findValue := node.FindValue(key, &id)
 	if findValue.Value != "" {
